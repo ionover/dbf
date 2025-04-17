@@ -70,10 +70,12 @@ public class Main {
             System.out.println();
 
             // Создаем переменные:
-            // Список названий полей
+            // Список названий полей и их типов
             List<String> fieldNames = new ArrayList<>();
+            List<Character> fieldTypes = new ArrayList<>();
             for (FieldInfo field: fields) {
                 fieldNames.add(field.name);
+                fieldTypes.add(field.type);
             }
 
             // Список записей, где каждая запись – список значений
@@ -148,7 +150,7 @@ public class Main {
 
             System.out.println(DBFGenerator.class);
 
-            generateDbfFile(fieldNames, recordsList);
+            generateDbfFile(fieldNames, fieldTypes, recordsList);
             System.out.println("DBF-файл 'output.dbf' успешно создан.");
         } catch (IOException e) {
             e.printStackTrace();

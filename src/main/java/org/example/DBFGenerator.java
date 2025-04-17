@@ -35,21 +35,19 @@ public class DBFGenerator {
      *
      * @throws IOException в случае ошибок записи или обработки данных
      */
-    public static void generateDbfFile(List<String> fieldNames, List<List<Object>> recordsList) throws IOException {
+    public static void generateDbfFile(List<String> fieldNames, List<Character> fieldTypes, List<List<Object>> recordsList) throws IOException {
         // Определяем свойства для каждого поля: тип, длину и количество десятичных знаков.
         int fieldCount = fieldNames.size();
         List<Field> fields = new ArrayList<>();
 
         for (int col = 0; col < fieldCount; col++) {
-            // По умолчанию рассматриваем поле как строковое
-            char type = 'C';
-            // Начинаем с длины имени поля (минимум)
+            // Используем тип поля из исходного файла, но преобразуем '@' в 'D' для корректной записи дат
+            char type = fieldTypes.get(col) == '@' ? 'D' : fieldTypes.get(col);
             int maxLength = fieldNames.get(col).length();
             int decimalCount = 0; // для числовых значений
 
-            // Перебираем записи для определения типа поля.
+            // Определяем максимальную длину и десятичные знаки для поля
             for (List<Object> record: recordsList) {
-                // Если в записи нет значения для данного индекса – пропускаем
                 if (col >= record.size()) {
                     continue;
                 }
@@ -58,48 +56,27 @@ public class DBFGenerator {
                     continue;
                 }
 
-                // Если значение число, то определяем тип как 'N'
-                if (value instanceof Number) {
-                    type = 'N';
+                if (type == 'N' && value instanceof Number) {
                     String strVal = value.toString();
                     int dotIndex = strVal.indexOf('.');
                     if (dotIndex >= 0) {
-                        decimalCount = strVal.length() - dotIndex - 1;
+                        decimalCount = Math.max(decimalCount, strVal.length() - dotIndex - 1);
                     }
                     maxLength = Math.max(maxLength, strVal.length());
+                } else if (type == 'D') {
+                    maxLength = 8; // даты в формате YYYYMMDD - 8 байт
                     break;
-                }
-                // Если значение – дата
-                else if (value instanceof Date) {
-                    type = 'D';
-                    maxLength = 8; // даты в DBF всегда 8 байт: "YYYYMMDD"
-                    break;
-                }
-                // Если значение – строка: попробуем распознать дату в формате "MM/dd/yyyy"
-                else if (value instanceof String) {
-                    String s = (String) value;
-                    try {
-                        SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
-                        sdf.setLenient(false);
-                        sdf.parse(s);
-                        type = 'D';
-                        maxLength = 8;
-                        break;
-                    } catch (ParseException e) {
-                        // если не является датой, остаёмся строкой
-                        maxLength = Math.max(maxLength, s.length());
-                    }
-                } else {
-                    // Для остальных типов используем строковое представление
+                } else if (type == 'C') {
                     String s = value.toString();
                     maxLength = Math.max(maxLength, s.length());
                 }
             }
+
             // При строковом поле длина должна быть не менее 1
             if (type == 'C') {
                 maxLength = Math.max(maxLength, 1);
             }
-            // Для числовых полей можно задать минимальную длину, например, 10 символов (чтобы корректно форматировать)
+            // Для числовых полей можно задать минимальную длину, например, 10 символов
             if (type == 'N') {
                 maxLength = Math.max(maxLength, 10);
             }
@@ -206,28 +183,26 @@ public class DBFGenerator {
                         fieldData = String.format(Locale.US, format, num);
                     } else if (f.type == 'D') {
                         // Для поля даты форматируем значение как "YYYYMMDD"
-                        Date date = null;
-                        if (value instanceof Date) {
-                            date = (Date) value;
-                        } else if (value instanceof String) {
-                            // Пытаемся распознать дату в формате "MM/dd/yyyy"
+                        if (value != null && value instanceof String) {
+                            String dateStr = (String) value;
                             try {
+                                // Пытаемся распознать дату в формате "MM/dd/yyyy"
                                 SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
                                 sdf.setLenient(false);
-                                date = sdf.parse((String) value);
+                                Date date = sdf.parse(dateStr);
+                                
+                                Calendar dateCal = Calendar.getInstance();
+                                dateCal.setTime(date);
+                                int year = dateCal.get(Calendar.YEAR);
+                                int month = dateCal.get(Calendar.MONTH) + 1;
+                                int day = dateCal.get(Calendar.DAY_OF_MONTH);
+                                fieldData = String.format("%04d%02d%02d", year, month, day);
                             } catch (ParseException e) {
-                                // Если не получилось распознать, оставляем null
+                                // Если не удалось распарсить дату, заполняем пробелами
+                                fieldData = "        "; // 8 пробелов
                             }
-                        }
-                        if (date != null) {
-                            Calendar calDate = Calendar.getInstance();
-                            calDate.setTime(date);
-                            int year = calDate.get(Calendar.YEAR);
-                            int month = calDate.get(Calendar.MONTH) + 1;
-                            int day = calDate.get(Calendar.DAY_OF_MONTH);
-                            fieldData = String.format("%04d%02d%02d", year, month, day);
                         } else {
-                            // Если дата не определена, заполняем пробелами
+                            // Если значение null, заполняем пробелами
                             fieldData = "        "; // 8 пробелов
                         }
                     } else {
