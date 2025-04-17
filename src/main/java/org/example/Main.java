@@ -106,7 +106,12 @@ public class Main {
                             recordValues[i] = null;
                         } else {
                             try {
-                                recordValues[i] = Double.parseDouble(numStr);
+                                // Сначала пробуем преобразовать в Integer
+                                if (!numStr.contains(".")) {
+                                    recordValues[i] = Integer.parseInt(numStr);
+                                } else {
+                                    recordValues[i] = Double.parseDouble(numStr);
+                                }
                             } catch (NumberFormatException e) {
                                 recordValues[i] = numStr;
                             }

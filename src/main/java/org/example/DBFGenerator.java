@@ -168,19 +168,26 @@ public class DBFGenerator {
                     Object value = record.get(col);
                     if (f.type == 'N') {
                         // Для числового поля форматируем число с заданным количеством десятичных знаков.
-                        double num;
-                        if (value instanceof Number) {
-                            num = ((Number) value).doubleValue();
+                        String format;
+                        if (value instanceof Integer) {
+                            // Для целых чисел используем формат без десятичной точки
+                            format = "%" + f.length + "d";
+                            fieldData = String.format(Locale.US, format, value);
                         } else {
-                            try {
-                                num = Double.parseDouble(value.toString());
-                            } catch (NumberFormatException ex) {
-                                num = 0;
+                            // Для дробных чисел используем формат с десятичной точкой
+                            double num;
+                            if (value instanceof Number) {
+                                num = ((Number) value).doubleValue();
+                            } else {
+                                try {
+                                    num = Double.parseDouble(value.toString());
+                                } catch (NumberFormatException ex) {
+                                    num = 0;
+                                }
                             }
+                            format = "%" + f.length + "." + f.decimalCount + "f";
+                            fieldData = String.format(Locale.US, format, num);
                         }
-                        // Формат: например, "%10.2f"
-                        String format = "%" + f.length + "." + f.decimalCount + "f";
-                        fieldData = String.format(Locale.US, format, num);
                     } else if (f.type == 'D') {
                         // Для поля даты форматируем значение как "YYYYMMDD"
                         if (value != null && value instanceof String) {
